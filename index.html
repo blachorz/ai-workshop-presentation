@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>跨部門 AI 分享會</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-1: #3b82f6; /* Blue */
+            --accent-2: #8b5cf6; /* Purple */
+            --accent-gradient: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            font-family: 'Helvetica Neue', Arial, 'Microsoft JhengHei', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            overflow: hidden;
+        }
+
+        .presentation-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .slide {
+            position: absolute;
+            width: 80%;
+            max-width: 1000px;
+            height: 80%;
+            opacity: 0;
+            transform: translateY(20px) scale(0.95);
+            transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .slide.active {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+        }
+
+        .slide.past {
+            transform: translateY(-20px) scale(0.95);
+        }
+
+        /* Typography & Components */
+        h1 {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            line-height: 1.2;
+        }
+
+        h2 {
+            font-size: 2.5rem;
+            margin-bottom: 1.5rem;
+            color: var(--accent-1);
+        }
+
+        p {
+            font-size: 1.5rem;
+            line-height: 1.6;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        li {
+            font-size: 1.5rem;
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+            color: var(--text-main);
+            position: relative;
+            padding-left: 2rem;
+        }
+
+        li::before {
+            content: '✨';
+            position: absolute;
+            left: 0;
+            top: 2px;
+            font-size: 1.2rem;
+        }
+
+        .highlight {
+            color: var(--text-main);
+            font-weight: bold;
+            border-bottom: 2px solid var(--accent-2);
+        }
+
+        .quote-box {
+            background: rgba(255, 255, 255, 0.05);
+            border-left: 5px solid var(--accent-2);
+            padding: 2rem;
+            border-radius: 0 10px 10px 0;
+            margin: 2rem 0;
+        }
+
+        .quote-box p {
+            font-size: 2rem;
+            font-style: italic;
+            color: var(--text-main);
+            margin: 0;
+        }
+
+        .quote-box .author {
+            font-size: 1.2rem;
+            color: var(--accent-1);
+            margin-top: 1rem;
+            text-align: right;
+            font-style: normal;
+        }
+
+        /* Controls / Progress */
+        .progress-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 4px;
+            background: var(--accent-gradient);
+            transition: width 0.3s ease;
+        }
+
+        .controls-hint {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            opacity: 0.5;
+        }
+
+        .tag {
+            display: inline-block;
+            background: rgba(59, 130, 246, 0.2);
+            padding: 0.2rem 0.8rem;
+            border-radius: 20px;
+            font-size: 1rem;
+            color: var(--accent-1);
+            margin-bottom: 1rem;
+        }
+
+        .center-text {
+            text-align: center;
+            align-items: center;
+        }
+
+        /* Modal Viewer for Images and PDFs */
+        #media-viewer {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.9);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        #media-viewer.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 3rem;
+            color: white;
+            cursor: pointer;
+            text-shadow: 0 0 10px rgba(0,0,0,0.5);
+            transition: 0.2s;
+            z-index: 10000;
+        }
+
+        .close-btn:hover {
+            color: #ef4444;
+            transform: scale(1.1);
+        }
+
+        .fullscreen-btn {
+            position: absolute;
+            top: 25px;
+            right: 80px;
+            font-size: 2rem;
+            color: white;
+            cursor: pointer;
+            text-shadow: 0 0 10px rgba(0,0,0,0.5);
+            transition: 0.2s;
+            z-index: 10000;
+            display: none; /* Only show when PDF is open */
+        }
+
+        .fullscreen-btn:hover {
+            color: #3b82f6;
+            transform: scale(1.1);
+        }
+
+        #viewer-img {
+            max-width: 90vw;
+            max-height: 90vh;
+            display: none;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        #viewer-pdf {
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 8px;
+        }
+
+        #pdf-wrapper {
+            position: relative;
+            width: 90vw;
+            height: 90vh;
+            display: none;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            background: #fff;
+            border-radius: 8px;
+        }
+
+        #viewer-video {
+            max-width: 90vw;
+            max-height: 90vh;
+            display: none;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            outline: none;
+        }
+
+        /* 滿版時移除圓角與寬度限制 */
+        #pdf-wrapper:fullscreen {
+            width: 100vw !important;
+            height: 100vh !important;
+            border-radius: 0 !important;
+            background: #000;
+        }
+        #pdf-wrapper:-webkit-full-screen {
+            width: 100vw !important;
+            height: 100vh !important;
+            border-radius: 0 !important;
+            background: #000;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="presentation-container" id="presentation">
+        
+        <!-- ================= 第一部分 ================= -->
+        <!-- Slide 1: Cover -->
+        <div class="slide active center-text">
+            <span class="tag">Part 1 : 引言 Introduction</span>
+            <h1>跨部門 AI 分享會</h1>
+            <p>無痛登入 AI 時代：從科技名詞到我們的工作語言</p>
+        </div>
+
+        <!-- Slide 2: 軟性開場 -->
+        <div class="slide">
+            <h2>🤝 認識我們的新同事</h2>
+            <p>今天我們來聊聊一位大家都聽過的「新同事」—— <span class="highlight">AI</span>。</p>
+            <p>期待未來每個月，這把火炬能在不同部門間歡樂地傳遞下去。</p>
+            <p>無論你是老手還是新手，這不是一堂深奧的技術課，而是<span class="highlight">「工作流++」</span>的分享討論。</p>
+        </div>
+
+        <!-- Slide 3: 為什麼要聽 -->
+        <div class="slide">
+            <h2>⚡ 為什麼你需要這個？</h2>
+            <p>身為媒體人，我們每天都在跟「資訊爆炸」與「時效性」賽跑。過去，我們只能靠「肝」來換取洞察...</p>
+            <ul>
+                <li>AI 已進化為具備邏輯與行動力的<strong>數位生命體</strong>。</li>
+                <li>如何雇用世界上最聰明、24小時不休息的<strong>「超級實習生」</strong>。</li>
+                <li>把枯燥的資料梳理交給它，把寶貴的時間留給你的<strong>創意與商業直覺</strong>。</li>
+            </ul>
+        </div>
+
+        <!-- Slide 4: 你會學到什麼 -->
+        <div class="slide">
+            <h2>👀 今天帶走點什麼好呢？</h2>
+            <ul style="display: flex; flex-direction: column; gap: 1rem;">
+                <li>
+                    <strong style="color: #60a5fa; font-size: 1.8rem; letter-spacing: 1px;">認知升級（從背誦到餵養）</strong><br>
+                    <span style="color: var(--text-muted); display: inline-block; margin-top: 0.5rem; line-height: 1.5;">看懂 AI 進化邏輯。<br>學會給 <span style="color: #fde047; font-weight: bold; background: rgba(253, 224, 71, 0.1); padding: 0 4px; border-radius: 4px;">「上下文 (Context)」</span> 比鑽研「話術 (Prompt)」更重要。</span>
+                </li>
+                <li>
+                    <strong style="color: #60a5fa; font-size: 1.8rem; letter-spacing: 1px;">抑制幻覺的工作流</strong><br>
+                    <span style="color: var(--text-muted); display: inline-block; margin-top: 0.5rem; line-height: 1.5;">介紹「零幻覺」資料處理法。<br>透過 NotebookLM 與 <span style="color: #fde047; font-weight: bold; background: rgba(253, 224, 71, 0.1); padding: 0 4px; border-radius: 4px;">「FACT 法則」</span>，10秒內榨乾萬字外電！</span>
+                </li>
+                <li>
+                    <strong style="color: #60a5fa; font-size: 1.8rem; letter-spacing: 1px;">提示工程實戰封裝（彩蛋）</strong><br>
+                    <span style="color: var(--text-muted); display: inline-block; margin-top: 0.5rem; line-height: 1.5;">展示 Google AI Studio 如何一秒轉出乾淨 API，<br>並贈送隨點即用的專屬 <span style="color: #fde047; font-weight: bold; background: rgba(253, 224, 71, 0.1); padding: 0 4px; border-radius: 4px;">「Gemini Gem」</span>！</span>
+                </li>
+            </ul>
+        </div>
+
+        <!-- ================= 第二部分 (中場/互動) ================= -->
+        <!-- Slide 5: 互動時間 -->
+        <div class="slide center-text" style="align-items: center;">
+            <span class="tag">Part 2 : 分享與互動體驗</span>
+            <h1 style="font-size: 2.5rem; margin-bottom: 2rem;">💡 內容分享流程</h1>
+            
+            <div style="display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 800px;">
+                
+                <!-- 上排：前三個卡片 -->
+                <div style="display: flex; justify-content: center; align-items: center; gap: 15px; width: 100%;">
+                    
+                    <!-- 步驟 1 -->
+                    <a href="#" onclick="openViewer('workshop-AI.png', 'image', event)" style="text-decoration: none; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(30, 41, 59, 0.8); border: 2px solid #3b82f6; border-radius: 12px; padding: 1rem; width: 150px; height: 140px; transition: all 0.3s; cursor: pointer; box-sizing: border-box; z-index: 2;" onmouseover="this.style.transform='translateY(-5px)'; this.style.borderColor='#8b5cf6'; this.style.boxShadow='0 10px 20px rgba(139, 92, 246, 0.3)'" onmouseout="this.style.transform='translateY(0)'; this.style.borderColor='#3b82f6'; this.style.boxShadow='none'">
+                        <span style="font-size: 2.5rem; margin-bottom: 0.5rem;">🤖</span>
+                        <h3 style="color: #f8fafc; font-size: 1.1rem; margin: 0;">AI 歷程</h3>
+                    </a>
+
+                    <span style="color: #8b5cf6; font-size: 1.5rem; font-weight: bold;">➔</span>
+
+                    <!-- 步驟 2 -->
+                    <a href="#" onclick="openViewer('workshop-prompt.png', 'image', event)" style="text-decoration: none; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(30, 41, 59, 0.8); border: 2px solid #3b82f6; border-radius: 12px; padding: 1rem; width: 150px; height: 140px; transition: all 0.3s; cursor: pointer; box-sizing: border-box; z-index: 2;" onmouseover="this.style.transform='translateY(-5px)'; this.style.borderColor='#8b5cf6'; this.style.boxShadow='0 10px 20px rgba(139, 92, 246, 0.3)'" onmouseout="this.style.transform='translateY(0)'; this.style.borderColor='#3b82f6'; this.style.boxShadow='none'">
+                        <span style="font-size: 2.5rem; margin-bottom: 0.5rem;">✍️</span>
+                        <h3 style="color: #f8fafc; font-size: 1.1rem; margin: 0;">Prompt 歷程</h3>
+                    </a>
+
+                    <span style="color: #8b5cf6; font-size: 1.5rem; font-weight: bold;">➔</span>
+
+                    <!-- 步驟 3 -->
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(30, 41, 59, 0.8); border: 2px solid #3b82f6; border-radius: 12px; padding: 1rem; width: 150px; height: 140px; transition: all 0.3s; box-sizing: border-box; z-index: 2;" onmouseover="this.style.borderColor='#8b5cf6'" onmouseout="this.style.borderColor='#3b82f6'">
+                        <span style="font-size: 2.5rem; margin-bottom: 0.5rem;">🏢</span>
+                        <h3 style="color: #f8fafc; font-size: 1.1rem; margin: 0; text-align: center;">鉅亨場景應用</h3>
+                        <div style="display: flex; gap: 8px; margin-top: 0.8rem;">
+                            <a href="#" onclick="openViewer('workshop-ind.png', 'image', event)" style="background: rgba(59,130,246,0.2); color: #60a5fa; text-decoration: none; padding: 0.3rem 0.5rem; border-radius: 4px; font-size: 0.85rem; border: 1px solid #3b82f6; transition: 0.2s;" onmouseover="this.style.background='#3b82f6'; this.style.color='#fff'" onmouseout="this.style.background='rgba(59,130,246,0.2)'; this.style.color='#60a5fa'">圖片</a>
+                            <a href="#" onclick="openViewer('financial-ai-automation.pdf', 'pdf', event)" style="background: rgba(139,92,246,0.2); color: #a78bfa; text-decoration: none; padding: 0.3rem 0.5rem; border-radius: 4px; font-size: 0.85rem; border: 1px solid #8b5cf6; transition: 0.2s;" onmouseover="this.style.background='#8b5cf6'; this.style.color='#fff'" onmouseout="this.style.background='rgba(139,92,246,0.2)'; this.style.color='#a78bfa'">PDF</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 大折線 (從第三個方塊連接到第四個方塊) -->
+                <svg viewBox="0 0 500 80" style="width: 100%; max-width: 500px; height: auto; margin: -5px auto -15px auto; display: block; overflow: visible; z-index: 1;">
+                    <!-- 虛線路徑: 從右側 (約 85%) 往下，往左折，再往下到左側 (約 25%) -->
+                    <path d="M 410 0 V 35 Q 410 45 400 45 H 130 Q 120 45 120 55 V 75" fill="none" stroke="#8b5cf6" stroke-width="4" stroke-dasharray="8 8"/>
+                    <!-- 箭頭 -->
+                    <polygon points="112,70 128,70 120,85" fill="#8b5cf6" />
+                </svg>
+
+                <!-- 下排：最後兩個卡片 -->
+                <div style="display: flex; justify-content: flex-start; align-items: center; gap: 15px; width: 100%; max-width: 500px; margin: 0 auto;">
+                    
+                    <!-- 步驟 4 (對齊折線的箭頭) -->
+                    <div style="position: relative; margin-left: 45px;">
+                        <a href="https://notebooklm.google.com/notebook/c2d24239-d4da-42ec-bbba-8ec4a967e494" target="_blank" style="text-decoration: none; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(30, 41, 59, 0.8); border: 2px solid #3b82f6; border-radius: 12px; padding: 1rem; width: 150px; height: 140px; transition: all 0.3s; cursor: pointer; box-sizing: border-box; z-index: 2;" onmouseover="this.style.transform='translateY(-5px)'; this.style.borderColor='#8b5cf6'; this.style.boxShadow='0 10px 20px rgba(139, 92, 246, 0.3)'" onmouseout="this.style.transform='translateY(0)'; this.style.borderColor='#3b82f6'; this.style.boxShadow='none'">
+                            <span style="font-size: 2.5rem; margin-bottom: 0.5rem;">🧠</span>
+                            <h3 style="color: #f8fafc; font-size: 1.1rem; margin: 0; text-align: center; line-height: 1.4;">NotebookLM<br>實際互動</h3>
+                        </a>
+                        <!-- Pro Tips 彩蛋 -->
+                        <a href="https://blachorz.notion.site/Simple-Prompt-31e9d9f5b53280f4b175ebded627e29f?source=copy_link" target="_blank" style="position: absolute; top: -15px; left: -25px; background: linear-gradient(135deg, #4ade80, #10b981); color: #0f172a; font-size: 0.85rem; font-weight: bold; padding: 0.4rem 0.8rem; border-radius: 20px; text-decoration: none; box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 10; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.1) rotate(-5deg)'" onmouseout="this.style.transform='scale(1) rotate(0deg)'">
+                            💡 Pro Tips
+                        </a>
+                    </div>
+
+                    <span style="color: #8b5cf6; font-size: 1.5rem; font-weight: bold;">➔</span>
+
+                    <!-- 步驟 5 -->
+                    <div style="position: relative;">
+                        <a href="https://aistudio.google.com/prompts/new_chat" target="_blank" style="text-decoration: none; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(30, 41, 59, 0.8); border: 2px solid #3b82f6; border-radius: 12px; padding: 1rem; width: 150px; height: 140px; transition: all 0.3s; cursor: pointer; box-sizing: border-box; z-index: 2;" onmouseover="this.style.transform='translateY(-5px)'; this.style.borderColor='#8b5cf6'; this.style.boxShadow='0 10px 20px rgba(139, 92, 246, 0.3)'" onmouseout="this.style.transform='translateY(0)'; this.style.borderColor='#3b82f6'; this.style.boxShadow='none'">
+                            <span style="font-size: 2.5rem; margin-bottom: 0.5rem;">🛠️</span>
+                            <h3 style="color: #f8fafc; font-size: 1.1rem; margin: 0; text-align: center; line-height: 1.4;">AI Studio<br>實際互動</h3>
+                        </a>
+                        <!-- Gem 提示彩蛋 -->
+                        <a href="https://gemini.google.com/gem/15VJlYLbojIkQm3XFM7XBEnjlta20DN_-?usp=sharing" target="_blank" style="position: absolute; top: -15px; right: -25px; background: linear-gradient(135deg, #fde047, #f59e0b); color: #0f172a; font-size: 0.85rem; font-weight: bold; padding: 0.4rem 0.8rem; border-radius: 20px; text-decoration: none; box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 10; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.1) rotate(5deg)'" onmouseout="this.style.transform='scale(1) rotate(0deg)'">
+                            ✨ 點擊看 Gem
+                        </a>
+                    </div>
+
+                </div>
+            </div>
+            
+            <p style="font-size: 1rem; margin-top: 2rem; color: #94a3b8;">（點擊上方各節點即可開啟對應素材或連結，在新分頁或彈出視窗打開）</p>
+        </div>
+
+        <!-- ================= 第三部分 ================= -->
+        <!-- Slide 6: 重點回顧 -->
+        <div class="slide">
+            <span class="tag">Part 3 : 結論 Conclusion</span>
+            <h2>🔄 今日重點回顧</h2>
+            <ul style="display: flex; flex-direction: column; gap: 1rem;">
+                <li>
+                    <strong style="color: #60a5fa; font-size: 1.8rem; letter-spacing: 1px;">觀念升級</strong><br>
+                    <span style="color: var(--text-muted); display: inline-block; margin-top: 0.5rem; line-height: 1.5;">從聊天機器人 (Chatbox) 到代理人 (Agents)；<br>從痛苦的提示 (Prompt) 到完美的 <span style="color: #fde047; font-weight: bold; background: rgba(253, 224, 71, 0.1); padding: 0 4px; border-radius: 4px;">上下文 (Context)</span>。</span>
+                </li>
+                <li>
+                    <strong style="color: #60a5fa; font-size: 1.8rem; letter-spacing: 1px;">精準洞察的護城河</strong><br>
+                    <span style="color: var(--text-muted); display: inline-block; margin-top: 0.5rem; line-height: 1.5;">牢記 <span style="color: #fde047; font-weight: bold; background: rgba(253, 224, 71, 0.1); padding: 0 4px; border-radius: 4px;">FACT 法則</span>，<br>用 NotebookLM 綁定真實資料庫，消滅幻覺焦慮。</span>
+                </li>
+                <li>
+                    <strong style="color: #60a5fa; font-size: 1.8rem; letter-spacing: 1px;">自動化思維</strong><br>
+                    <span style="color: var(--text-muted); display: inline-block; margin-top: 0.5rem; line-height: 1.5;">透過 AI Studio 結構化輸出與 <span style="color: #fde047; font-weight: bold; background: rgba(253, 224, 71, 0.1); padding: 0 4px; border-radius: 4px;">Gemini Gem</span>，<br>將 AI 封裝成無縫接軌系統的最強資料處理器。</span>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Slide 7: Call to Action -->
+        <div class="slide">
+            <h2>🚀 下一步：builder 思維，無痛協作</h2>
+            <p>這就是我們下一代媒體人的<span class="highlight">「AI 自動化工作流」</span>：</p>
+            <p>👉 行銷/業務有好點子 ➡️ 用 NotebookLM 驗證切角 ➡️ 技術部用 AI Studio 寫成 API。</p>
+            <br>
+            <div style="background: rgba(59,130,246,0.1); padding: 1.5rem; border-radius: 8px; border: 1px dashed var(--accent-1);">
+                <strong style="color: var(--text-main); font-size: 1.5rem;">📝 課後小作業：</strong><br>
+                <span style="color: var(--text-muted); font-size: 1.3rem;">試著帶一個『由 AI 幫你從無聊報告中提煉出的變現點子』進來！</span>
+            </div>
+        </div>
+
+        <!-- Slide 8: 結語與金句 -->
+        <div class="slide" style="display: flex; flex-direction: column; justify-content: center; height: 100%;">
+            <h2 style="margin-bottom: 3rem; font-size: 3rem; text-shadow: 0 0 20px rgba(59, 130, 246, 0.5);">✨ 科技與人性的交會</h2>
+            
+            <div class="quote-box" style="background: linear-gradient(90deg, rgba(139, 92, 246, 0.15) 0%, rgba(30, 41, 59, 0) 100%); border-left: 6px solid #8b5cf6; padding: 3rem; margin-bottom: 4rem; box-shadow: -10px 0 30px rgba(139, 92, 246, 0.1);">
+                <p style="font-size: 2.8rem; font-weight: 500; letter-spacing: 2px; margin-bottom: 1rem; color: #f8fafc;">
+                    電腦是沒用的，<span style="color: #a78bfa;">因為它們只會給你答案</span>
+                </p>
+                <p style="font-size: 1.5rem; color: #64748b; font-style: italic;">
+                    Computers are useless. They can only give you answers.
+                </p>
+                <div class="author" style="font-size: 1.4rem; color: #60a5fa; margin-top: 2rem; font-weight: bold;">
+                    — 畢卡索 (Pablo Picasso)
+                </div>
+            </div>
+            
+            <div style="padding-left: 1rem; border-left: 3px solid rgba(59, 130, 246, 0.5);">
+                <p style="font-size: 1.8rem; line-height: 1.8; color: #e2e8f0; margin-bottom: 1.5rem;">
+                    AI 可以在幾秒內給出上萬種答案，<br>
+                    但<strong style="color: #fde047; font-size: 2rem; background: rgba(253, 224, 71, 0.1); padding: 0 5px;">「提出好問題」</strong>與<strong style="color: #fde047; font-size: 2rem; background: rgba(253, 224, 71, 0.1); padding: 0 5px;">「找到獨特切角」</strong>的洞察力，<br>
+                    依然掌握在<span style="color: #60a5fa; font-weight: bold;">各位手中</span>。
+                </p>
+                <p style="font-size: 1.6rem; color: #94a3b8; font-style: italic;">
+                    AI 不會取代有靈魂的媒體人，它是一面放大鏡，用來無限放大你們的創造力。
+                </p>
+            </div>
+        </div>
+
+        <!-- Slide 9: QA -->
+        <div class="slide center-text">
+            <span class="tag">Part 4 : 交流時間</span>
+            <h1>Q & A</h1>
+            <p>期待下個月，換你們站在這裡分享精彩的 AI 故事！</p>
+            
+            <a href="#" onclick="openViewer('nocode-ai-team.mp4', 'video', event)" style="display: inline-block; margin-top: 3rem; background: rgba(59, 130, 246, 0.15); border: 1px solid #3b82f6; color: #60a5fa; padding: 0.8rem 1.5rem; border-radius: 30px; text-decoration: none; font-size: 1.2rem; transition: all 0.3s; z-index: 10;" onmouseover="this.style.background='#3b82f6'; this.style.color='#fff'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='rgba(59, 130, 246, 0.15)'; this.style.color='#60a5fa'; this.style.transform='scale(1)'">
+                ▶️ 觀看「無程式碼 AI 團隊整合」影片
+            </a>
+
+            <!-- 參考範例小按鈕群 -->
+            <div style="margin-top: 4rem; display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+                <a href="#" onclick="openViewer('example-parentOS.png', 'image', event)" style="display: flex; align-items: center; gap: 6px; font-size: 1rem; color: #a78bfa; background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.5); padding: 0.6rem 1.2rem; border-radius: 25px; text-decoration: none; transition: all 0.3s;" onmouseover="this.style.background='rgba(139, 92, 246, 0.2)'; this.style.borderColor='#8b5cf6'; this.style.color='#fff'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='rgba(139, 92, 246, 0.1)'; this.style.borderColor='rgba(139, 92, 246, 0.5)'; this.style.color='#a78bfa'; this.style.transform='scale(1)'">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                    ParentOS
+                </a>
+                <a href="#" onclick="openViewer('example-portfolio.png', 'image', event)" style="display: flex; align-items: center; gap: 6px; font-size: 1rem; color: #a78bfa; background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.5); padding: 0.6rem 1.2rem; border-radius: 25px; text-decoration: none; transition: all 0.3s;" onmouseover="this.style.background='rgba(139, 92, 246, 0.2)'; this.style.borderColor='#8b5cf6'; this.style.color='#fff'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='rgba(139, 92, 246, 0.1)'; this.style.borderColor='rgba(139, 92, 246, 0.5)'; this.style.color='#a78bfa'; this.style.transform='scale(1)'">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                    Portfolio
+                </a>
+                <a href="#" onclick="openViewer('example-style01.png', 'image', event)" style="display: flex; align-items: center; gap: 6px; font-size: 1rem; color: #a78bfa; background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.5); padding: 0.6rem 1.2rem; border-radius: 25px; text-decoration: none; transition: all 0.3s;" onmouseover="this.style.background='rgba(139, 92, 246, 0.2)'; this.style.borderColor='#8b5cf6'; this.style.color='#fff'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='rgba(139, 92, 246, 0.1)'; this.style.borderColor='rgba(139, 92, 246, 0.5)'; this.style.color='#a78bfa'; this.style.transform='scale(1)'">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                    Style 01
+                </a>
+                <a href="#" onclick="openViewer('example-style02.png', 'image', event)" style="display: flex; align-items: center; gap: 6px; font-size: 1rem; color: #a78bfa; background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.5); padding: 0.6rem 1.2rem; border-radius: 25px; text-decoration: none; transition: all 0.3s;" onmouseover="this.style.background='rgba(139, 92, 246, 0.2)'; this.style.borderColor='#8b5cf6'; this.style.color='#fff'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='rgba(139, 92, 246, 0.1)'; this.style.borderColor='rgba(139, 92, 246, 0.5)'; this.style.color='#a78bfa'; this.style.transform='scale(1)'">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                    Style 02
+                </a>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="progress-bar" id="progress"></div>
+    <div class="controls-hint">使用鍵盤 ⬅️ ➡️ 或點擊滑鼠左鍵切換</div>
+
+    <script>
+        const slides = document.querySelectorAll('.slide');
+        const progressBar = document.getElementById('progress');
+        let currentSlide = 0;
+
+        function updateSlides() {
+            slides.forEach((slide, index) => {
+                slide.classList.remove('active', 'past');
+                if (index === currentSlide) {
+                    slide.classList.add('active');
+                } else if (index < currentSlide) {
+                    slide.classList.add('past');
+                }
+            });
+            
+            const progress = ((currentSlide) / (slides.length - 1)) * 100;
+            progressBar.style.width = `${progress}%`;
+        }
+
+        function nextSlide() {
+            if (currentSlide < slides.length - 1) {
+                currentSlide++;
+                updateSlides();
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 0) {
+                currentSlide--;
+                updateSlides();
+            }
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === 'Space' || e.key === 'Enter') {
+                nextSlide();
+            } else if (e.key === 'ArrowLeft') {
+                prevSlide();
+            }
+        });
+
+        // Click navigation (Click right half to go next, left half to go prev)
+        document.addEventListener('click', (e) => {
+            // Prevent slide change if clicking on a link, button, or inside the modal viewer
+            if (e.target.closest('a') || e.target.closest('#media-viewer')) return;
+
+            const clickX = e.clientX;
+            const screenWidth = window.innerWidth;
+            if (clickX > screenWidth / 2) {
+                nextSlide();
+            } else {
+                prevSlide();
+            }
+        });
+
+        // Init
+        updateSlides();
+
+        // Media Viewer Functions
+        function openViewer(url, type, event) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            const viewer = document.getElementById('media-viewer');
+            const img = document.getElementById('viewer-img');
+            const pdfWrapper = document.getElementById('pdf-wrapper');
+            const pdf = document.getElementById('viewer-pdf');
+            const video = document.getElementById('viewer-video');
+            const fsBtn = document.getElementById('fullscreen-btn');
+            
+            // Reset everything first
+            img.style.display = 'none';
+            pdfWrapper.style.display = 'none';
+            video.style.display = 'none';
+            fsBtn.style.display = 'none';
+            video.pause();
+
+            if (type === 'image') {
+                img.src = url;
+                img.style.display = 'block';
+            } else if (type === 'pdf') {
+                // Add parameters to hide browser PDF toolbars and fit the page, allowing normal scrolling
+                pdf.src = url + "#toolbar=0&navpanes=0&scrollbar=0&view=FitH";
+                pdfWrapper.style.display = 'block';
+                fsBtn.style.display = 'block';
+            } else if (type === 'video') {
+                video.src = url;
+                video.style.display = 'block';
+                video.play();
+            }
+            
+            viewer.classList.add('active');
+        }
+
+        function closeViewer(event) {
+            if (event) {
+                event.stopPropagation();
+            }
+            const viewer = document.getElementById('media-viewer');
+            viewer.classList.remove('active');
+            
+            // Stop video playing immediately
+            const video = document.getElementById('viewer-video');
+            video.pause();
+            
+            // Clear sources to stop playing/loading in background
+            setTimeout(() => {
+                document.getElementById('viewer-img').src = '';
+                document.getElementById('viewer-pdf').src = '';
+                video.src = '';
+            }, 300);
+        }
+
+        function toggleFullscreen(event) {
+            if (event) event.stopPropagation();
+            const pdfElem = document.getElementById('pdf-wrapper');
+            
+            if (!document.fullscreenElement) {
+                if (pdfElem.requestFullscreen) {
+                    pdfElem.requestFullscreen();
+                } else if (pdfElem.mozRequestFullScreen) { /* Safari */
+                    pdfElem.mozRequestFullScreen();
+                } else if (pdfElem.webkitRequestFullscreen) { /* Chrome, Safari and Opera */
+                    pdfElem.webkitRequestFullscreen();
+                } else if (pdfElem.msRequestFullscreen) { /* IE/Edge */
+                    pdfElem.msRequestFullscreen();
+                }
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+    </script>
+
+    <!-- Modal Viewer Layer -->
+    <div id="media-viewer" onclick="if(event.target === this) closeViewer(event)">
+        <div id="fullscreen-btn" class="fullscreen-btn" onclick="toggleFullscreen(event)" title="全螢幕">⛶</div>
+        <div class="close-btn" onclick="closeViewer(event)">×</div>
+        <img id="viewer-img" src="" alt="Presentation Material">
+        <video id="viewer-video" controls></video>
+        
+        <div id="pdf-wrapper">
+            <iframe id="viewer-pdf" src=""></iframe>
+        </div>
+    </div>
+</body>
+</html>
